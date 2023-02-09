@@ -45,299 +45,311 @@ MODULE usrdef_sbc
 CONTAINS
 
    SUBROUTINE usrdef_sbc_oce( kt, Kbb )
-     !!---------------------------------------------------------------------
-     !!                    ***  ROUTINE usrdef_sbc_oce  ***
-     !!              
-     !! ** Purpose :   provide at each time-step the GYRE surface boundary
-     !!              condition, i.e. the momentum, heat and freshwater fluxes.
-     !!
-     !! ** Method  :   analytical configuration.
-     !!                CAUTION : never mask the surface stress field !
-     !!
-     !! ** Action  : - set the ocean surface boundary condition, i.e.   
-     !!                   utau, vtau, taum, wndm, qns, qsr, emp, sfx
-     !!---------------------------------------------------------------------
-     INTEGER, INTENT(in) ::   kt      ! ocean time step
-     INTEGER, INTENT(in) ::   Kbb  ! ocean time index
-     !
-     INTEGER  ::   ji, jj
-     REAL(wp) ::   zL, z1_2L 
-     REAL(wp) ::   zdeltasst, zts_eq, zts_n, zdeltaT
-     REAL(wp) ::   zdeltaemp, zemp_mean, zF0, zconv, zaemp, zb, zdeltaemp2, zaemp2
-     REAL(wp) ::   zdeltatau, zatau
-     REAL(wp) ::   zf1, zf2, zf3, zweight2, zweight3
-     REAL(wp) ::   za1, za2, za3
-     REAL(wp) ::   zphi01, zphi02, zphi03
-     REAL(wp) ::   z1_d1, zd2, z1_d2, zd3, z1_d3
-     REAL(wp) ::   z1_s
-     REAL(wp), DIMENSION(jpi,jpj) ::   zSurf
-     REAL(wp) ::   zcos_sais1, zcos_sais2
-     !!---------------------------------------------------------------------
-     !
-     SELECT CASE( nn_forcingtype )
-     CASE(0)
-        CALL ctl_stop( 'usrdef_sbc_oce : option not available anymore' )
-     CASE(1)
-        CALL ctl_stop( 'usrdef_sbc_oce : option not available anymore' )
-     CASE(2)
-        ! just a zonal wind stress, going eastward
-        IF( kt .EQ. nit000 .AND. lwp ) THEN
-           WRITE(numout,*)'usrdef_sbc_oce : analytical surface fluxes'
-           WRITE(numout,*) 'Using just a zonal wind stress, goind eastward'
-        ENDIF
-        utau(:,:) = -0.1_wp
-        vtau(:,:) = 0._wp
-        taum(:,:) = 0._wp
-        wndm(:,:) = 0._wp
-        !
-        emp (:,:) = 0._wp
-        sfx (:,:) = 0._wp
-        qns (:,:) = 0._wp
-        qsr (:,:) = 0._wp
-     CASE(3)
-        ! no forcing
-        IF( kt .EQ. nit000 .AND. lwp ) THEN
-           WRITE(numout,*)'usrdef_sbc_oce : analytical surface fluxes'
-           WRITE(numout,*) 'no forcing'
-        ENDIF
-        utau(:,:) = 0._wp
-        vtau(:,:) = 0._wp
-        taum(:,:) = 0._wp
-        wndm(:,:) = 0._wp
-        !
-        emp (:,:) = 0._wp
-        sfx (:,:) = 0._wp
-        qns (:,:) = 0._wp
-        qsr (:,:) = 0._wp
-     CASE(4)
-        ! Forcing close to Wolfe and Cessi 2014, JPO
-        IF( kt == nit000 .AND. lwp ) THEN
-           WRITE(numout,*) 'usrdef_sbc_oce : analytical surface fluxes'
-           WRITE(numout,*) '~~~~~~~~~~~~~~'
-           WRITE(numout,*) '   Forcing close to Wolfe and Cessi 2014, JPO'
-           WRITE(numout,*) '      Zonal annual wind'
-           WRITE(numout,*) '      Zonal annual E-P'
-           IF( ln_qsr )   THEN
-              WRITE(numout,*) '      Solar heat flux'
-              IF( ln_ann_cyc )   THEN
-                 WRITE(numout,*) '         Annual cycle of solar heat flux'
-              ELSE
-                 WRITE(numout,*) '         Annual average of solar heat flux (December = June)'
-              ENDIF
-              IF( ln_diu_cyc )   THEN
-                 WRITE(numout,*) '         Diurnal cycle of solar heat flux'
-              ELSE
-                 WRITE(numout,*) '         Daily average of solar heat flux (day = night)'
-              ENDIF
-           ELSE
-              WRITE(numout,*) '      No solar heat flux'
-           ENDIF
-           WRITE(numout,*) '      Zonal annual T* (heat forcing proportional to (SST - T*)'
-           IF( rn_srp /= 0._wp )   THEN
-              WRITE(numout,*) '      Zonal annual S* (salt flux proportional to (SSS - S*)'
-           ELSE
-              WRITE(numout,*) '      No salt restoring'
-           ENDIF
-        ENDIF
-        ! Initialization of parameters
-        zL = 61                        ! [degrees] Approximative meridional extend of the basin
-        !
-        !ztau0         =   0.1_wp       ! [Pa]
-        zatau         =   0.8_wp       ! [no unit]
-        zdeltatau     =   5.77_wp      ! [degrees]
-        !ztrp          = -40._wp        ! [W/m2/K] retroaction term on heat fluxes 
-        zts_eq        =  25._wp        ! [deg C]
-        zts_n         =   0._wp        ! [deg C]
-        zdeltasst     =  16.22_wp      ! [degrees]
-        !
-        zconv         =   3.16e-5_wp   ! convertion factor: 1 m/yr => 3.16e-5 mm/s
-        zaemp      =   2._wp           ! [no unit]
-        zdeltaemp  =   8.11_wp         ! [degrees]
-        zF0        =   0.81_wp         ! [m/yr] before conversion
-        zF0 = zF0 * zconv              ! [mm/s] after  conversion
-        IF( kt == nit000 ) THEN
-           ALLOCATE( ztstar(jpi,jpj) )   ! Allocation of ztstar
-           ALLOCATE( zqsr_dayMean(jpi,jpj) )   ! Allocation of zqsr_dayMean
-           IF( rn_srp /= 0._wp )   THEN
-              ALLOCATE( zsstar(jpi,jpj) )   ! Allocation of zsstar
-              zsstar(:,:) = 37.12_wp * EXP( - gphit(:,:)**2 / 260._wp**2 ) - 1.1_wp * EXP( - gphit(:,:)**2 / 7.5_wp**2 )
-           ENDIF
-        ENDIF
-        ! necessary to compute at each time step because seasonnal variation of Ztstar and solar heat flux
-        vtau(:,:) = 0._wp   ! no meridional wind stress
-        wndm(:,:) = 0._wp   ! no use of 10 m wind speed
-        !
-        ! SALT FLUX
-        IF( rn_srp /= 0._wp )   THEN
-           sfx(:,:) = ( rn_srp * ( ts(:,:,1,jp_sal, Kbb) - zsstar(:,:) ) ) * tmask(:,:,1)   ! Restoring salt flux
-        ELSE
-           sfx (:,:) = 0._wp   ! no salt flux
-        ENDIF
-        !
-        DO jj = 1, jpj
-           DO ji = 1, jpi
-              utau(ji,jj)    = rn_ztau0 * (             - COS( ( 3 * rpi * gphit(ji,jj) )  / ( 2 * zL )    )  + zatau * EXP( -  gphit(ji,jj)**2        / zdeltatau**2 ) )
-              taum(ji,jj)    = ABS( utau(ji,jj) )
-              IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
-              !
-              ! EMP from Wolfe and Cessi 2014, JPO
-              emp (ji,jj) =   zF0 * (               COS( (     rpi * gphit(ji,jj) )  / (     zL )    )  - zaemp * EXP( -  gphit(ji,jj)**2        / zdeltaemp**2 ) )
-              ! Seasonnal cycle on T* coming from zcos_sais2
-              ztstar(ji,jj)   = (zts_eq - zts_n - zcos_sais2 * zdeltaT ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + zts_n + zcos_sais2 * zdeltaT
-           END DO
-        END DO
-        !
-        emp(:,:) = rn_emp_prop * emp(:,:)   ! taking the proportionality factor into account
-        CALL remove_emp_mean()
-        !
-        ! Q SOLAR (from Gyre)
-        IF( ln_qsr )   THEN
-           zqsr_dayMean(:,:) = 230._wp * COS( rpi * (gphit(:,:) - 23.5 * zcos_sais1 ) / ( 0.9_wp * 180._wp ) ) * tmask(:,:,1)
-        ELSE
-           zqsr_dayMean(:,:) = 0._wp
-        ENDIF
-        CALL compute_diurn_cycle( kt, zqsr_dayMean, ln_diu_cyc )   ! Adding diurnal cycle if needed
-        !
-        ! QNS
-        ! take (SST - T*) into account, heat content of emp, remove qsr
-        qns(:,:) = (  rn_trp * ( ts(:,:,1,jp_tem, Kbb) - ztstar(:,:) ) &
-             &      - emp(:,:) * ts(:,:,1,jp_tem, Kbb) * rcp           &
-             &      - zqsr_dayMean(:,:)                         ) * tmask(:,:,1)
-     CASE(5)
-        ! Forcing inspired from Wolfe and Cessi 2014, JPO
-        IF( kt == nit000 .AND. lwp ) THEN
-           WRITE(numout,*) 'usrdef_sbc_oce : analytical surface fluxes'
-           WRITE(numout,*) '~~~~~~~~~~~~~~'
-           WRITE(numout,*) '   Forcing inspired from *Wolfe and Cessi 2014, JPO*, and from the *GYRE configuration*'
-           WRITE(numout,*) '      Zonal annual wind'
-           WRITE(numout,*) '      Zonal annual E-P'
-           IF( ln_qsr )   THEN
-              WRITE(numout,*) '      Solar heat flux'
-              IF( ln_ann_cyc )   THEN
-                 WRITE(numout,*) '         Annual cycle of solar heat flux'
-              ELSE
-                 WRITE(numout,*) '         Annual average of solar heat flux (December = June)'
-              ENDIF
-              IF( ln_diu_cyc )   THEN
-                 WRITE(numout,*) '         Diurnal cycle of solar heat flux'
-              ELSE
-                 WRITE(numout,*) '         Daily average of solar heat flux (day = night)'
-              ENDIF
-           ELSE
-              WRITE(numout,*) '      No solar heat flux'
-           ENDIF
-           WRITE(numout,*) '      Zonal T* (heat forcing proportional to (SST - T*)'
-           IF( ln_ann_cyc )   THEN
-              WRITE(numout,*) '         Annual cycle for T*'
-           ELSE
-              WRITE(numout,*) '         Annual average for T* (December = June)'
-           ENDIF
-           IF( rn_srp /= 0._wp )   THEN
-              WRITE(numout,*) '      Zonal annual S* (salt flux proportional to (SSS - S*)'
-           ELSE
-              WRITE(numout,*) '      No salt restoring'
-           ENDIF
-        ENDIF
-        ! Initialization of parameters
-        ! Computation of the day of the year (from Gyre)
-        CALL compute_day_of_year( kt, zcos_sais1, zcos_sais2, ln_ann_cyc)
-        ! 
-        zL = 61                     ! [degrees] Approximative meridional extend of the basin
-        ! Wind stress
-        !ztau0         =   0.1_wp    ! [Pa]
-        zatau         =   0.8_wp    ! [no unit]
-        zdeltatau     =   5.77_wp   ! [deg North]
-        ! T star and qns
-        !ztrp          = -40._wp     ! [W/m2/K] retroaction term on heat fluxes 
-        zts_eq        =  25._wp     ! [deg C] Temperature at the equator
-        zts_n         =   0._wp     ! [deg C] Temperature in the north
-        zdeltasst     =  16.22_wp   ! [deg North]
-        z1_2L         =   1._wp / (2._wp * zL)
-        zdeltaT = 2                 ! [deg C] half difference of temperature during winter and summer in the north (magnitude of the cos) !!rc TODO set in namelist
-        ! EMP
-        zconv         =   1._wp / ( 86400._wp)   ! convertion factor: 1 mm/day => 1/(3600*24) mm/s
-        !!rc TODO put a1, a2 and a3 in namelist
-        za1 = -3.24_wp              ! [mm/day] Set the amplitude of EMP at the equator
-        za2 = 4.15_wp               ! [mm/day] Set the amplitude of EMP at mid latitude
-        za3 = -1.59_wp              ! [mm/day] Set the amplitude of EMP at the northern part
-        zphi01 = 0._wp              ! [deg North]
-        zphi02 = 20._wp             ! [deg North]
-        zphi03 = 50._wp             ! [deg North]
-        z1_d1 = 1._wp / 8._wp       ! [1 / deg North]
-        zd2 = 30._wp                ! [deg North]
-        z1_d2 = 1._wp / zd2         ! [1 / deg North]
-        zd3 = 40._wp                ! [deg North]
-        z1_d3 = 1._wp / zd3         ! [1 / deg North]
-        z1_s = 1._wp / 10._wp       ! streching of the tanh function (i.e. smoothness of the filter)
-        za1 = za1 * zconv           ! [mm/s] after  conversion
-        za2 = za2 * zconv           ! [mm/s] after  conversion
-        za3 = za3 * zconv           ! [mm/s] after  conversion
-        !
-        IF( kt == nit000 ) THEN
-           ALLOCATE( ztstar(jpi,jpj) )   ! Allocation of ztstar
-           ALLOCATE( zqsr_dayMean(jpi,jpj) )   ! Allocation of zqsr_dayMean
-           IF( rn_srp /= 0._wp )   THEN
-              ALLOCATE( zsstar(jpi,jpj) )   ! Allocation of zsstar
-              ! See https://www.desmos.com/calculator/qrapqqrbfa
-              zsstar(:,:) = 37.12_wp * EXP( - gphit(:,:)**2 / 260._wp**2 ) - 1.1_wp * EXP( - gphit(:,:)**2 / 7.5_wp**2 )
-           ENDIF
-        ENDIF
-        ! necessary to compute at each time step because seasonnal variation of ztstar and solar heat flux
-        vtau(:,:) = 0._wp   ! no meridional wind stress
-        wndm(:,:) = 0._wp   ! no use of 10 m wind speed
-        !
-        ! SALT FLUX
-        IF( rn_srp /= 0._wp )   THEN
-           sfx(:,:) = ( rn_srp * ( ts(:,:,1,jp_sal, Kbb) - zsstar(:,:) ) ) * tmask(:,:,1)   ! Restoring salt flux
-        ELSE
-           sfx (:,:) = 0._wp   ! no salt flux
-        ENDIF
-        !
-        DO jj = 1, jpj
-           DO ji = 1, jpi
-              utau(ji,jj) = rn_ztau0 * ( -COS((3 * rpi * gphit(ji,jj))/(2 * zL)) + zatau * EXP(-gphit(ji,jj)**2/zdeltatau**2) )
-              taum(ji,jj) = ABS( utau(ji,jj) )
-              IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
-              !
-              ! EMP
-              ! See https://www.desmos.com/calculator/v0vpbcc81h
-              ! weights
-              zweight2 = 0.5 * ( TANH((gphit(ji,jj) - zphi02 + zd2 * 0.5) * z1_s) - TANH((gphit(ji,jj) - zphi02 - zd2 * 0.5) * z1_s) )
-              zweight3 = 0.5 * ( TANH((gphit(ji,jj) - zphi03 + zd3 * 0.5) * z1_s) - TANH((gphit(ji,jj) - zphi03 - zd3 * 0.5) * z1_s) )
-              ! each component
-              zf1 = za1 * EXP(-(gphit(ji,jj) - zphi01)**2 * z1_d1**2               )
-              zf2 = za2 * SIN( (gphit(ji,jj) - zphi02)    * z1_d2 * rpi + 0.5 * rpi) * zweight2
-              zf3 = za3 * SIN( (gphit(ji,jj) - zphi03)    * z1_d3 * rpi + 0.5 * rpi) * zweight3
-              ! total
-              emp (ji,jj) = zf1 + zf2 + zf3
-              ! The mean is removed later on (no simple analytical function)
-              !
-              ! T*
-              ! See https://www.desmos.com/calculator/zij8tgy5yr
-              ! Seasonnal cycle on T* coming from zcos_sais2
-              ztstar(ji,jj)   = (zts_eq - (zts_n + zcos_sais2 * zdeltaT) ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + (zts_n + zcos_sais2 * zdeltaT)
-           END DO
-        END DO
-        !
-        emp(:,:) = rn_emp_prop * emp(:,:)   ! taking the proportionality factor into account
-        CALL remove_emp_mean()
-        !
-        ! Q SOLAR (flux from GYRE)
-        ! see https://www.desmos.com/calculator/87duqiuxsf
-        IF( ln_qsr )   THEN
-           zqsr_dayMean(:,:) = 230._wp * COS( rpi * (gphit(:,:) - 23.5 * zcos_sais1 ) / ( 0.9_wp * 180._wp ) ) * tmask(:,:,1)
-           CALL compute_diurn_cycle( kt, zqsr_dayMean, ln_diu_cyc )   ! Adding diurnal cycle if needed
-        ELSE
-           zqsr_dayMean(:,:) = 0._wp
-           qsr(:,:) = 0._wp
-        ENDIF
-        !
-        ! QNS
-        ! take (SST - T*) into account, heat content of emp, remove zqsr_dayMean
-        qns(:,:) = (  rn_trp * ( ts(:,:,1,jp_tem, Kbb) - ztstar(:,:) ) &
-             &      - emp(:,:) * ts(:,:,1,jp_tem, Kbb) * rcp           &
-             &      - zqsr_dayMean(:,:)                         ) * tmask(:,:,1)
-     END SELECT
+      !!---------------------------------------------------------------------
+      !!                    ***  ROUTINE usrdef_sbc_oce  ***
+      !!              
+      !! ** Purpose :   provide at each time-step the GYRE surface boundary
+      !!              condition, i.e. the momentum, heat and freshwater fluxes.
+      !!
+      !! ** Method  :   analytical configuration.
+      !!                CAUTION : never mask the surface stress field !
+      !!
+      !! ** Action  : - set the ocean surface boundary condition, i.e.   
+      !!                   utau, vtau, taum, wndm, qns, qsr, emp, sfx
+      !!---------------------------------------------------------------------
+      INTEGER, INTENT(in) ::   kt      ! ocean time step
+      INTEGER, INTENT(in) ::   Kbb  ! ocean time index
+      !
+      INTEGER  ::   ji, jj
+      REAL(wp) ::   zL, z1_2L 
+      REAL(wp) ::   zdeltasst, zts_eq, zts_n, zdeltaT
+      REAL(wp) ::   zdeltaemp, zemp_mean, zF0, zconv, zaemp, zb, zdeltaemp2, zaemp2
+      REAL(wp) ::   zdeltatau, zatau
+      REAL(wp) ::   zf1, zf2, zf3, zweight2, zweight3
+      REAL(wp) ::   za1, za2, za3
+      REAL(wp) ::   zphi01, zphi02, zphi03
+      REAL(wp) ::   z1_d1, zd2, z1_d2, zd3, z1_d3
+      REAL(wp) ::   z1_s
+      REAL(wp), DIMENSION(jpi,jpj) ::   zSurf
+      REAL(wp) ::   zcos_sais1, zcos_sais2
+      !!---------------------------------------------------------------------
+      !
+      SELECT CASE( nn_forcingtype )
+      CASE(0)
+         CALL ctl_stop( 'usrdef_sbc_oce : option not available anymore' )
+      CASE(1)
+         CALL ctl_stop( 'usrdef_sbc_oce : option not available anymore' )
+      CASE(2)
+         ! just a zonal wind stress, going eastward
+         IF( kt .EQ. nit000 .AND. lwp ) THEN
+            WRITE(numout,*)'usrdef_sbc_oce : analytical surface fluxes'
+            WRITE(numout,*) 'Using just a zonal wind stress, goind eastward'
+         ENDIF
+         utau(:,:) = -0.1_wp
+         vtau(:,:) = 0._wp
+         taum(:,:) = 0._wp
+         wndm(:,:) = 0._wp
+         !
+         emp (:,:) = 0._wp
+         sfx (:,:) = 0._wp
+         qns (:,:) = 0._wp
+         qsr (:,:) = 0._wp
+      CASE(3)
+         ! no forcing
+         IF( kt .EQ. nit000 .AND. lwp ) THEN
+            WRITE(numout,*)'usrdef_sbc_oce : analytical surface fluxes'
+            WRITE(numout,*) 'no forcing'
+         ENDIF
+         utau(:,:) = 0._wp
+         vtau(:,:) = 0._wp
+         taum(:,:) = 0._wp
+         wndm(:,:) = 0._wp
+         !
+         emp (:,:) = 0._wp
+         sfx (:,:) = 0._wp
+         qns (:,:) = 0._wp
+         qsr (:,:) = 0._wp
+      CASE(4)
+         ! Forcing close to Wolfe and Cessi 2014, JPO
+         IF( kt == nit000 .AND. lwp ) THEN
+            WRITE(numout,*) 'usrdef_sbc_oce : analytical surface fluxes'
+            WRITE(numout,*) '~~~~~~~~~~~~~~'
+            WRITE(numout,*) '   Forcing close to Wolfe and Cessi 2014, JPO'
+            WRITE(numout,*) '      Zonal annual wind'
+            WRITE(numout,*) '      Zonal annual E-P'
+            IF( ln_qsr )   THEN
+               WRITE(numout,*) '      Solar heat flux'
+               IF( ln_ann_cyc )   THEN
+                  WRITE(numout,*) '         Annual cycle of solar heat flux'
+               ELSE
+                  WRITE(numout,*) '         Annual average of solar heat flux (December = June)'
+               ENDIF
+               IF( ln_diu_cyc )   THEN
+                  WRITE(numout,*) '         Diurnal cycle of solar heat flux'
+               ELSE
+                  WRITE(numout,*) '         Daily average of solar heat flux (day = night)'
+               ENDIF
+            ELSE
+               WRITE(numout,*) '      No solar heat flux'
+            ENDIF
+            WRITE(numout,*) '      Zonal annual T* (heat forcing proportional to (SST - T*)'
+            IF( rn_srp /= 0._wp )   THEN
+               WRITE(numout,*) '      Zonal annual S* (salt flux proportional to (SSS - S*)'
+            ELSE
+               WRITE(numout,*) '      No salt restoring'
+            ENDIF
+         ENDIF
+         ! Initialization of parameters
+         zL = 61                        ! [degrees] Approximative meridional extend of the basin
+         !
+         !ztau0         =   0.1_wp       ! [Pa]
+         zatau         =   0.8_wp       ! [no unit]
+         zdeltatau     =   5.77_wp      ! [degrees]
+         !ztrp          = -40._wp        ! [W/m2/K] retroaction term on heat fluxes 
+         zts_eq        =  25._wp        ! [deg C]
+         zts_n         =   0._wp        ! [deg C]
+         zdeltasst     =  16.22_wp      ! [degrees]
+         !
+         zconv         =   3.16e-5_wp   ! convertion factor: 1 m/yr => 3.16e-5 mm/s
+         zaemp      =   2._wp           ! [no unit]
+         zdeltaemp  =   8.11_wp         ! [degrees]
+         zF0        =   0.81_wp         ! [m/yr] before conversion
+         zF0 = zF0 * zconv              ! [mm/s] after  conversion
+         IF( kt == nit000 ) THEN
+            ALLOCATE( ztstar(jpi,jpj) )   ! Allocation of ztstar
+            ALLOCATE( zqsr_dayMean(jpi,jpj) )   ! Allocation of zqsr_dayMean
+            IF( rn_srp /= 0._wp )   THEN
+               ALLOCATE( zsstar(jpi,jpj) )   ! Allocation of zsstar
+               DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+                  zsstar(ji,jj) = 37.12_wp * EXP( - gphit(ji,jj)**2 / 260._wp**2 ) - 1.1_wp * EXP( - gphit(ji,jj)**2 / 7.5_wp**2 )
+               END_2D
+            ENDIF
+         ENDIF
+         ! necessary to compute at each time step because seasonnal variation of Ztstar and solar heat flux
+         vtau(:,:) = 0._wp   ! no meridional wind stress
+         wndm(:,:) = 0._wp   ! no use of 10 m wind speed
+         !
+         ! SALT FLUX
+         IF( rn_srp /= 0._wp )   THEN
+            DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+               sfx(ji,jj) = ( rn_srp * ( ts(ji,jj,1,jp_sal, Kbb) - zsstar(ji,jj) ) ) * tmask(ji,jj,1)   ! Restoring salt flux
+            END_2D
+         ELSE
+            sfx (:,:) = 0._wp   ! no salt flux
+         ENDIF
+         !
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+            utau(ji,jj)    = rn_ztau0 * (        - COS( ( 3 * rpi * gphit(ji,jj) )  / ( 2 * zL )    )  + zatau * EXP( -  gphit(ji,jj)**2        / zdeltatau**2 ) )
+            taum(ji,jj)    = ABS( utau(ji,jj) )
+            IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
+            !
+            ! EMP from Wolfe and Cessi 2014, JPO
+            emp (ji,jj) =   rn_emp_prop * zF0 * (  COS( (     rpi * gphit(ji,jj) )  / (     zL )    )  - zaemp * EXP( -  gphit(ji,jj)**2        / zdeltaemp**2 ) )
+            ! Seasonnal cycle on T* coming from zcos_sais2
+            ztstar(ji,jj)   = (zts_eq - zts_n - zcos_sais2 * zdeltaT ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + zts_n + zcos_sais2 * zdeltaT
+         END_2D
+         !
+         !emp(:,:) = rn_emp_prop * emp(:,:)   ! taking the proportionality factor into account
+         !CALL remove_emp_mean()
+         !
+         ! Q SOLAR (from Gyre)
+         IF( ln_qsr )   THEN
+            DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+               zqsr_dayMean(ji,jj) = 230._wp * COS( rpi * (gphit(ji,jj) - 23.5 * zcos_sais1 ) / ( 0.9_wp * 180._wp ) ) * tmask(ji,jj,1)
+            END_2D
+         ELSE
+            zqsr_dayMean(:,:) = 0._wp
+         ENDIF
+         CALL compute_diurn_cycle( kt, zqsr_dayMean, ln_diu_cyc )   ! Adding diurnal cycle if needed
+         !
+         ! QNS
+         ! take (SST - T*) into account, heat content of emp, remove qsr
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+            qns(ji,jj) = (  rn_trp * ( ts(ji,jj,1,jp_tem, Kbb) - ztstar(ji,jj) ) &
+                 &      - emp(ji,jj) * ts(ji,jj,1,jp_tem, Kbb) * rcp           &
+                 &      - zqsr_dayMean(ji,jj)                         ) * tmask(ji,jj,1)
+         END_2D
+      CASE(5)
+         ! Forcing inspired from Wolfe and Cessi 2014, JPO
+         IF( kt == nit000 .AND. lwp ) THEN
+            WRITE(numout,*) 'usrdef_sbc_oce : analytical surface fluxes'
+            WRITE(numout,*) '~~~~~~~~~~~~~~'
+            WRITE(numout,*) '   Forcing inspired from *Wolfe and Cessi 2014, JPO*, and from the *GYRE configuration*'
+            WRITE(numout,*) '      Zonal annual wind'
+            WRITE(numout,*) '      Zonal annual E-P'
+            IF( ln_qsr )   THEN
+               WRITE(numout,*) '      Solar heat flux'
+               IF( ln_ann_cyc )   THEN
+                  WRITE(numout,*) '         Annual cycle of solar heat flux'
+               ELSE
+                  WRITE(numout,*) '         Annual average of solar heat flux (December = June)'
+               ENDIF
+               IF( ln_diu_cyc )   THEN
+                  WRITE(numout,*) '         Diurnal cycle of solar heat flux'
+               ELSE
+                  WRITE(numout,*) '         Daily average of solar heat flux (day = night)'
+               ENDIF
+            ELSE
+               WRITE(numout,*) '      No solar heat flux'
+            ENDIF
+            WRITE(numout,*) '      Zonal T* (heat forcing proportional to (SST - T*)'
+            IF( ln_ann_cyc )   THEN
+               WRITE(numout,*) '         Annual cycle for T*'
+            ELSE
+               WRITE(numout,*) '         Annual average for T* (December = June)'
+            ENDIF
+            IF( rn_srp /= 0._wp )   THEN
+               WRITE(numout,*) '      Zonal annual S* (salt flux proportional to (SSS - S*)'
+            ELSE
+               WRITE(numout,*) '      No salt restoring'
+            ENDIF
+         ENDIF
+         ! Initialization of parameters
+         ! Computation of the day of the year (from Gyre)
+         CALL compute_day_of_year( kt, zcos_sais1, zcos_sais2, ln_ann_cyc)
+         ! 
+         zL = 132                                                                                                                                                                                                                                 ! [degrees] Approximative meridional extend of the basin
+         ! Wind stress
+         !ztau0         =   0.1_wp    ! [Pa]
+         zatau         =   0.8_wp    ! [no unit]
+         zdeltatau     =   5.77_wp   ! [deg North]
+         ! T star and qns
+         !ztrp          = -40._wp     ! [W/m2/K] retroaction term on heat fluxes 
+         zts_eq        =  25._wp     ! [deg C] Temperature at the equator
+         zts_n         =   0._wp     ! [deg C] Temperature in the north
+         zdeltasst     =  16.22_wp   ! [deg North]
+         z1_2L         =   1._wp / (2._wp * zL)
+         zdeltaT = 2                 ! [deg C] half difference of temperature during winter and summer in the north (magnitude of the cos) !!rc TODO set in namelist
+         ! EMP
+         zconv         =   1._wp / ( 86400._wp)   ! convertion factor: 1 mm/day => 1/(3600*24) mm/s
+         !!rc TODO put a1, a2 and a3 in namelist
+         za1 = -3.24_wp              ! [mm/day] Set the amplitude of EMP at the equator
+         za2 = 4.15_wp               ! [mm/day] Set the amplitude of EMP at mid latitude
+         za3 = -1.59_wp              ! [mm/day] Set the amplitude of EMP at the northern part
+         zphi01 = 0._wp              ! [deg North]
+         zphi02 = 20._wp             ! [deg North]
+         zphi03 = 50._wp             ! [deg North]
+         z1_d1 = 1._wp / 8._wp       ! [1 / deg North]
+         zd2 = 30._wp                ! [deg North]
+         z1_d2 = 1._wp / zd2         ! [1 / deg North]
+         zd3 = 40._wp                ! [deg North]
+         z1_d3 = 1._wp / zd3         ! [1 / deg North]
+         z1_s = 1._wp / 10._wp       ! streching of the tanh function (i.e. smoothness of the filter)
+         za1 = za1 * zconv           ! [mm/s] after  conversion
+         za2 = za2 * zconv           ! [mm/s] after  conversion
+         za3 = za3 * zconv           ! [mm/s] after  conversion
+         !
+         IF( kt == nit000 ) THEN
+            ALLOCATE( ztstar(jpi,jpj) )   ! Allocation of ztstar
+            ALLOCATE( zqsr_dayMean(jpi,jpj) )   ! Allocation of zqsr_dayMean
+            IF( rn_srp /= 0._wp )   THEN
+               ALLOCATE( zsstar(jpi,jpj) )   ! Allocation of zsstar
+               ! See https://www.desmos.com/calculator/qrapqqrbfa
+               DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+                  zsstar(ji,jj) = 37.12_wp * EXP( - gphit(ji,jj)**2 / 260._wp**2 ) - 1.1_wp * EXP( - gphit(ji,jj)**2 / 7.5_wp**2 )
+               END_2D
+            ENDIF
+         ENDIF
+         ! necessary to compute at each time step because seasonnal variation of ztstar and solar heat flux
+         vtau(:,:) = 0._wp   ! no meridional wind stress
+         wndm(:,:) = 0._wp   ! no use of 10 m wind speed
+         !
+         ! SALT FLUX
+         IF( rn_srp /= 0._wp )   THEN
+            DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+               sfx(ji,jj) = ( rn_srp * ( ts(ji,jj,1,jp_sal, Kbb) - zsstar(ji,jj) ) ) * tmask(ji,jj,1)   ! Restoring salt flux
+            END_2D
+         ELSE
+            sfx (:,:) = 0._wp   ! no salt flux
+         ENDIF
+         !
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+            utau(ji,jj) = rn_ztau0 * ( -COS((3 * rpi * gphit(ji,jj))/(2 * zL)) + zatau * EXP(-gphit(ji,jj)**2/zdeltatau**2) )
+            taum(ji,jj) = ABS( utau(ji,jj) )
+            IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
+            !
+            ! EMP
+            ! See https://www.desmos.com/calculator/v0vpbcc81h
+            ! weights
+            zweight2 = 0.5 * ( TANH((gphit(ji,jj) - zphi02 + zd2 * 0.5) * z1_s) - TANH((gphit(ji,jj) - zphi02 - zd2 * 0.5) * z1_s) )
+            zweight3 = 0.5 * ( TANH((gphit(ji,jj) - zphi03 + zd3 * 0.5) * z1_s) - TANH((gphit(ji,jj) - zphi03 - zd3 * 0.5) * z1_s) )
+            ! each component
+            zf1 = za1 * EXP(-(gphit(ji,jj) - zphi01)**2 * z1_d1**2               )
+            zf2 = za2 * SIN( (gphit(ji,jj) - zphi02)    * z1_d2 * rpi + 0.5 * rpi) * zweight2
+            zf3 = za3 * SIN( (gphit(ji,jj) - zphi03)    * z1_d3 * rpi + 0.5 * rpi) * zweight3
+            ! total
+            emp (ji,jj) = rn_emp_prop * ( zf1 + zf2 + zf3 )
+            ! The mean is removed later on (no simple analytical function)
+            !
+            ! T*
+            ! See https://www.desmos.com/calculator/zij8tgy5yr
+            ! Seasonnal cycle on T* coming from zcos_sais2
+            ztstar(ji,jj)   = (zts_eq - (zts_n + zcos_sais2 * zdeltaT) ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + (zts_n + zcos_sais2 * zdeltaT)
+         END_2D
+         !
+         !emp(:,:) = rn_emp_prop * emp(:,:)   ! taking the proportionality factor into account
+         !CALL remove_emp_mean()
+         !
+         ! Q SOLAR (flux from GYRE)
+         ! see https://www.desmos.com/calculator/87duqiuxsf
+         IF( ln_qsr )   THEN
+            DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+              zqsr_dayMean(ji,jj) = 230._wp * COS( rpi * (gphit(ji,jj) - 23.5 * zcos_sais1 ) / ( 0.9_wp * 180._wp ) ) * tmask(ji,jj,1)
+            END_2D
+            CALL compute_diurn_cycle( kt, zqsr_dayMean, ln_diu_cyc )   ! Adding diurnal cycle if needed
+         ELSE
+            zqsr_dayMean(:,:) = 0._wp
+            qsr(:,:) = 0._wp
+         ENDIF
+         !
+         ! QNS
+         ! take (SST - T*) into account, heat content of emp, remove zqsr_dayMean
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+            qns(ji,jj) = (  rn_trp * ( ts(ji,jj,1,jp_tem, Kbb) - ztstar(ji,jj) ) &
+                 &      - emp(ji,jj) * ts(ji,jj,1,jp_tem, Kbb) * rcp           &
+                 &      - zqsr_dayMean(ji,jj)                         ) * tmask(ji,jj,1)
+         END_2D
+      END SELECT
      ! We call lbc_lnk to take the boundaries into account (especially the equator symmetrical condition)
      CALL lbc_lnk( 'usrdef_sbc', taum, 'T',  1. )
      CALL lbc_lnk( 'usrdef_sbc', wndm, 'T',  1. )
@@ -361,7 +373,7 @@ CONTAINS
    END SUBROUTINE usrdef_sbc_ice_flx
 
     
-   SUBROUTINE remove_emp_mean()     
+   SUBROUTINE remove_emp_mean()   ! !!dk this is not used for now  
      !!---------------------------------------------------------------------
      !!                    ***  ROUTINE remove_emp_mean  ***
      !!              
@@ -468,6 +480,8 @@ CONTAINS
      REAL(wp), DIMENSION(jpi,jpj), INTENT(in   ) ::   pqsr_dayMean
      LOGICAL , optional          , INTENT(in   ) ::   ll_diu_cyc    ! if .false. use the mean value, if .true. use the diurnal cycle.
      !
+     INTEGER  ::   ji, jj                 ! dummy loop indices
+     REAL(wp), DIMENSION(jpi,jpj)                ::   zdiu_cyc ! diurnal cycle
      LOGICAL  ::   ld_compute   ! local variable to know if we need to compute the diurnal cycle
      !!---------------------------------------------------------------------
      !
@@ -478,10 +492,15 @@ CONTAINS
         ld_compute = .TRUE.
      ENDIF
      IF( ld_compute )   THEN
-        IF(  kt == nit000 )   nday_qsr = -1
-        qsr(:,:) = sbc_dcy( pqsr_dayMean(:,:) ) * tmask(:,:,1)
+         IF(  kt == nit000 )   nday_qsr = -1
+         zdiu_cyc = sbc_dcy( pqsr_dayMean(:,:)) !
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+            qsr(ji,jj) = zdiu_cyc(ji,jj) * tmask(ji,jj,1)
+         END_2D
      ELSE
-        qsr(:,:) =  pqsr_dayMean(:,:)
+      DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+         qsr(ji,jj) =  pqsr_dayMean(ji,jj)
+      END_2D
      ENDIF
    END SUBROUTINE compute_diurn_cycle
    !!======================================================================
