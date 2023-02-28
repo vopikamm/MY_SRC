@@ -189,12 +189,10 @@ CONTAINS
          IF( ln_mle    )   CALL tra_mle_trp( kt, nit000, zuu, zvv, zww, 'TRA', Kmm       )   ! add the mle transport (if necessary)
          !
          ! TEMP: [tiling] This change not necessary after all lbc_lnks removed in the nn_hls = 2 case in tra_adv_fct
-         IF( l_iom ) THEN
-            IF( .NOT. l_istiled .OR. ntile == nijtile )  THEN                ! Do only on the last tile
-               CALL iom_put( "uocetr_eff", zuu )                                        ! output effective transport
-               CALL iom_put( "vocetr_eff", zvv )
-               CALL iom_put( "wocetr_eff", zww )
-            ENDIF
+         IF( .NOT. l_istiled .OR. ntile == nijtile )  THEN                ! Do only on the last tile
+            CALL iom_put( "uocetr_eff", zuu )                                        ! output effective transport
+            CALL iom_put( "vocetr_eff", zvv )
+            CALL iom_put( "wocetr_eff", zww )
          ENDIF
          !
 !!gm ???
