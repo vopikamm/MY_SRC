@@ -18,7 +18,7 @@ MODULE usrdef_sbc
    USE phycst                                                      ! physical constants
    USE sbcdcy, ONLY: sbc_dcy, nday_qsr                             ! surface boundary condition: diurnal cycle
    !
-   USE usrdef_nam, ONLY : nn_forcingtype, rn_ztau0, rn_emp_prop, ln_ann_cyc, ln_diu_cyc, rn_trp, rn_srp, ln_qsr
+   USE usrdef_nam, ONLY : nn_forcingtype, rn_ztau0, rn_emp_prop, ln_ann_cyc, ln_diu_cyc, rn_trp, rn_srp, ln_qsr, rn_phi_max
    !
    USE in_out_manager  ! I/O manager
    USE iom             ! 
@@ -61,7 +61,7 @@ CONTAINS
       INTEGER, INTENT(in) ::   Kbb  ! ocean time index
       !
       INTEGER  ::   ji, jj
-      REAL(wp) ::   zL, z1_2L 
+      REAL(wp) ::   z1_2L 
       REAL(wp) ::   zdeltasst, zts_eq, zts_n, zdeltaT
       REAL(wp) ::   zdeltaemp, zemp_mean, zF0, zconv, zaemp, zb, zdeltaemp2, zaemp2
       REAL(wp) ::   zdeltatau, zatau
@@ -140,7 +140,7 @@ CONTAINS
             ENDIF
          ENDIF
          ! Initialization of parameters
-         zL = 61                        ! [degrees] Approximative meridional extend of the basin
+         ! zL = 61                        ! [degrees] Approximative meridional extend of the basin
          !
          !ztau0         =   0.1_wp       ! [Pa]
          zatau         =   0.8_wp       ! [no unit]
@@ -179,12 +179,12 @@ CONTAINS
          ENDIF
          !
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            utau(ji,jj)    = rn_ztau0 * (        - COS( ( 3 * rpi * gphit(ji,jj) )  / ( 2 * zL )    )  + zatau * EXP( -  gphit(ji,jj)**2        / zdeltatau**2 ) )
+            utau(ji,jj)    = rn_ztau0 * (        - COS( ( 3 * rpi * gphit(ji,jj) )  / ( 2 * rn_phi_max )    )  + zatau * EXP( -  gphit(ji,jj)**2        / zdeltatau**2 ) )
             taum(ji,jj)    = ABS( utau(ji,jj) )
             IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
             !
             ! EMP from Wolfe and Cessi 2014, JPO
-            emp (ji,jj) =   rn_emp_prop * zF0 * (  COS( (     rpi * gphit(ji,jj) )  / (     zL )    )  - zaemp * EXP( -  gphit(ji,jj)**2        / zdeltaemp**2 ) )
+            emp (ji,jj) =   rn_emp_prop * zF0 * (  COS( (     rpi * gphit(ji,jj) )  / (     rn_phi_max )    )  - zaemp * EXP( -  gphit(ji,jj)**2        / zdeltaemp**2 ) )
             ! Seasonnal cycle on T* coming from zcos_sais2
             ztstar(ji,jj)   = (zts_eq - zts_n - zcos_sais2 * zdeltaT ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + zts_n + zcos_sais2 * zdeltaT
          END_2D
@@ -248,7 +248,7 @@ CONTAINS
          ! Computation of the day of the year (from Gyre)
          CALL compute_day_of_year( kt, zcos_sais1, zcos_sais2, ln_ann_cyc)
          ! 
-         zL = 132                                                                                                                                                                                                                                 ! [degrees] Approximative meridional extend of the basin
+         ! zL = 132                                                                                                                                                                                                                                 ! [degrees] Approximative meridional extend of the basin
          ! Wind stress
          !ztau0         =   0.1_wp    ! [Pa]
          zatau         =   0.8_wp    ! [no unit]
@@ -258,7 +258,7 @@ CONTAINS
          zts_eq        =  25._wp     ! [deg C] Temperature at the equator
          zts_n         =   0._wp     ! [deg C] Temperature in the north
          zdeltasst     =  16.22_wp   ! [deg North]
-         z1_2L         =   1._wp / (2._wp * zL)
+         z1_2L         =   1._wp / (2._wp * rn_phi_max)
          zdeltaT = 2                 ! [deg C] half difference of temperature during winter and summer in the north (magnitude of the cos) !!rc TODO set in namelist
          ! EMP
          zconv         =   1._wp / ( 86400._wp)   ! convertion factor: 1 mm/day => 1/(3600*24) mm/s
@@ -304,7 +304,7 @@ CONTAINS
          ENDIF
          !
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            utau(ji,jj) = rn_ztau0 * ( -COS((3 * rpi * gphit(ji,jj))/(2 * zL)) + zatau * EXP(-gphit(ji,jj)**2/zdeltatau**2) )
+            utau(ji,jj) = rn_ztau0 * ( -COS((3 * rpi * gphit(ji,jj))/(2 * rn_phi_max)) + zatau * EXP(-gphit(ji,jj)**2/zdeltatau**2) )
             taum(ji,jj) = ABS( utau(ji,jj) )
             IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
             !

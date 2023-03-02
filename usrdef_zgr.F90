@@ -198,30 +198,33 @@ CONTAINS
          CALL zgr_test_slopes( zbathy, pdept, pe3u, pe3v )
          !
          !                                           ! masked top and bottom ocean t-level indices
-         zbathy(:,:) = 1._wp                         ! Use zbathy as land-sea mask to compute k_top and k_bot
-         !
-         
-         IF (ln_Iperio) THEN
-            nn_cha_min  = nn_jeq_min - merc_proj(rn_cha_min, rn_e1_deg) + 1
-            nn_cha_max  = nn_jeq_min - merc_proj(rn_cha_max, rn_e1_deg) + 1
-            DO jj = 1, jpj
-               IF (mjg(jj) <= nn_cha_min) THEN
-                  zbathy(  mi0(     1+nn_hls):mi1(     1+nn_hls),jj) = 0._wp   ! first column of inner global domain at 0
-                  zbathy(  mi0(jpiglo-nn_hls):mi1(jpiglo-nn_hls),jj) = 0._wp   ! last  column of inner global domain at 0
-               ENDIF
-               IF (mjg(jj) >= nn_cha_max) THEN
-                  zbathy(  mi0(     1+nn_hls):mi1(     1+nn_hls),jj) = 0._wp   ! first column of inner global domain at 0
-                  zbathy(  mi0(jpiglo-nn_hls):mi1(jpiglo-nn_hls),jj) = 0._wp   ! last  column of inner global domain at 0
-               ENDIF
-            END DO
-         ENDIF
-
-         !
-         CALL lbc_lnk( 'usr_def_zgr', zbathy, 'T', 1._wp )
-         k_top(:,:) =         INT( zbathy(:,:) )
-         k_bot(:,:) = jpkm1 * INT( zbathy(:,:) )  
+         k_top(:,:) = 1    
+         k_bot(:,:) = jpkm1
          !
       ENDIF
+   
+      zbathy(:,:) = 1._wp                         ! Use zbathy as land-sea mask to compute k_top and k_bot
+      !
+      IF (ln_Iperio) THEN
+         nn_cha_min  = nn_jeq_min - merc_proj(rn_cha_min, rn_e1_deg) + 1
+         nn_cha_max  = nn_jeq_min - merc_proj(rn_cha_max, rn_e1_deg) + 1
+         DO jj = 1, jpj
+            IF (mjg(jj) <= nn_cha_min) THEN
+               zbathy(  mi0(     1+nn_hls):mi1(     1+nn_hls),jj) = 0._wp   ! first column of inner global domain at 0
+               zbathy(  mi0(jpiglo-nn_hls):mi1(jpiglo-nn_hls),jj) = 0._wp   ! last  column of inner global domain at 0
+            ENDIF
+            IF (mjg(jj) >= nn_cha_max) THEN
+               zbathy(  mi0(     1+nn_hls):mi1(     1+nn_hls),jj) = 0._wp   ! first column of inner global domain at 0
+               zbathy(  mi0(jpiglo-nn_hls):mi1(jpiglo-nn_hls),jj) = 0._wp   ! last  column of inner global domain at 0
+            ENDIF
+         END DO
+      ENDIF
+
+      CALL lbc_lnk( 'usr_def_zgr', zbathy, 'T', 1._wp )
+
+      k_top(:,:) = k_top(:,:) * INT( zbathy(:,:) )
+      k_bot(:,:) = k_bot(:,:) * INT( zbathy(:,:) )
+      !
    END SUBROUTINE usr_def_zgr
 
    
