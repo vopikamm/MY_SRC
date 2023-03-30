@@ -344,10 +344,17 @@ CONTAINS
       IF( lk_mpp )   CALL mpp_max( 'zgr_bat', pH )
       IF(lwp)   WRITE(numout,*) '      Effective Hmax   = ', pH, ' m      while rn_H   = ', rn_H, ' m'
       !
+      ! Mid-Atlantic ridge
+      IF (ln_mid_ridge) THEN
+         zmidLam = (zmaxlam + zminlam) / 2
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+            IF (zphit(ji, jj) >= (rn_cha_min + rn_cha_max) / 2) THEN
+               pbathy(ji,jj) = gauss_bathy( 8.0, zmidLam, zlamt(ji, jj), 2000., pbathy(ji, jj))
+            ENDIF
+         END_2D
+      ENDIF
+      !
       ! Flattening the bathymetry in the channel
-
-      ! nn_cha_min  = nn_jeq_min - merc_proj(rn_cha_min, rn_e1_deg) + 1
-      ! nn_cha_max  = nn_jeq_min - merc_proj(rn_cha_max, rn_e1_deg) + 1
       IF( ln_Iperio )   THEN
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
             IF (zphit(ji, jj) >= rn_cha_min .AND. zphit(ji, jj) <= rn_cha_max) THEN
@@ -357,20 +364,12 @@ CONTAINS
          END_2D
       ENDIF
       !
-      ! Mid-Atlantic ridge
-      IF (ln_mid_ridge) THEN
-         zmidLam = (zmaxlam + zminlam) / 2
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            pbathy(ji,jj) = gauss_bathy( 8.0, zmidLam, zlamt(ji, jj), 2000., pbathy(ji, jj))
-         END_2D
-      ENDIF
-      !
       ! Drake-Sill
       IF (ln_drake_sill) THEN
          zmidPhi = (rn_cha_max + rn_cha_min) / 2
          zrad    = (rn_cha_max - rn_cha_min) / 2
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            pbathy(ji,jj) = gauss_ring( 2., zminlam, zmidphi, zrad, zlamt(ji, ji), zphit(ji, jj), 2000., pbathy(ji, jj))
+            pbathy(ji,jj) = gauss_ring( 2., zminlam, zmidphi, zrad, zlamt(ji, ji), zphit(ji, jj), 2500., pbathy(ji, jj))
          END_2D
       ENDIF
    END SUBROUTINE zgr_bat

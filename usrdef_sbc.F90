@@ -18,7 +18,7 @@ MODULE usrdef_sbc
    USE phycst                                                      ! physical constants
    USE sbcdcy, ONLY: sbc_dcy, nday_qsr                             ! surface boundary condition: diurnal cycle
    !
-   USE usrdef_nam, ONLY : nn_forcingtype, rn_ztau0, rn_emp_prop, ln_ann_cyc, ln_diu_cyc, rn_trp, rn_srp, ln_qsr, rn_phi_max
+   USE usrdef_nam, ONLY : nn_forcingtype, rn_ztau0, rn_emp_prop, ln_ann_cyc, ln_diu_cyc, rn_trp, rn_srp, ln_qsr, rn_phi_max, rn_phi_min
    !
    USE in_out_manager  ! I/O manager
    USE iom             ! 
@@ -64,6 +64,8 @@ CONTAINS
       REAL(wp) ::   z1_2L 
       REAL(wp) ::   zdeltasst, zts_eq, zts_n, zdeltaT
       REAL(wp) ::   zdeltaemp, zemp_mean, zF0, zconv, zaemp, zb, zdeltaemp2, zaemp2
+      REAL(wp), DIMENSION(7)  ::  znodes_phi     ! Latitude of nodes    [degrees]
+      REAL(wp), DIMENSION(7)  ::  znodes_tau     ! Values of nodes      [Pa]
       REAL(wp) ::   zdeltatau, zatau
       REAL(wp) ::   zf1, zf2, zf3, zweight2, zweight3
       REAL(wp) ::   za1, za2, za3
@@ -143,8 +145,10 @@ CONTAINS
          ! zL = 61                        ! [degrees] Approximative meridional extend of the basin
          !
          !ztau0         =   0.1_wp       ! [Pa]
-         zatau         =   0.8_wp       ! [no unit]
-         zdeltatau     =   5.77_wp      ! [degrees]
+         znodes_phi    = (/rn_phi_min, -45._wp, -15._wp, 0._wp, 15._wp, 45._wp, rn_phi_max /)
+         znodes_tau    = (/0._wp, 0.2_wp, -0.1_wp, -0.02_wp, -0.1_wp, 0.1_wp, 0._wp /)
+         !zatau         =   0.8_wp       ! [no unit]
+         !zdeltatau     =   5.77_wp      ! [degrees]
          !ztrp          = -40._wp        ! [W/m2/K] retroaction term on heat fluxes 
          zts_eq        =  25._wp        ! [deg C]
          zts_n         =   0._wp        ! [deg C]
@@ -179,7 +183,8 @@ CONTAINS
          ENDIF
          !
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            utau(ji,jj)    = rn_ztau0 * (        - COS( ( 3 * rpi * gphit(ji,jj) )  / ( 2 * rn_phi_max )    )  + zatau * EXP( -  gphit(ji,jj)**2        / zdeltatau**2 ) )
+            utau(ji,jj)    = znl_wnd(znodes_phi, znodes_tau, gphiu(ji,jj))
+            !utau(ji,jj)    = rn_ztau0 * (        - COS( ( 3 * rpi * gphit(ji,jj) )  / ( 2 * rn_phi_max )    )  + zatau * EXP( -  gphit(ji,jj)**2        / zdeltatau**2 ) )
             taum(ji,jj)    = ABS( utau(ji,jj) )
             IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
             !
@@ -251,8 +256,10 @@ CONTAINS
          ! zL = 132                                                                                                                                                                                                                                 ! [degrees] Approximative meridional extend of the basin
          ! Wind stress
          !ztau0         =   0.1_wp    ! [Pa]
-         zatau         =   0.8_wp    ! [no unit]
-         zdeltatau     =   5.77_wp   ! [deg North]
+         znodes_phi    = (/rn_phi_min, -45._wp, -15._wp, 0._wp, 15._wp, 45._wp, rn_phi_max /)
+         znodes_tau    = (/0._wp, 0.2_wp, -0.1_wp, -0.02_wp, -0.1_wp, 0.1_wp, 0._wp /)
+         ! zatau         =   0.8_wp    ! [no unit]
+         ! zdeltatau     =   5.77_wp   ! [deg North]
          ! T star and qns
          !ztrp          = -40._wp     ! [W/m2/K] retroaction term on heat fluxes 
          zts_eq        =  25._wp     ! [deg C] Temperature at the equator
@@ -304,7 +311,8 @@ CONTAINS
          ENDIF
          !
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            utau(ji,jj) = rn_ztau0 * ( -COS((3 * rpi * gphit(ji,jj))/(2 * rn_phi_max)) + zatau * EXP(-gphit(ji,jj)**2/zdeltatau**2) )
+            utau(ji,jj)    = znl_wnd(znodes_phi, znodes_tau, gphiu(ji,jj))
+            !utau(ji,jj) = rn_ztau0 * ( -COS((3 * rpi * gphit(ji,jj))/(2 * rn_phi_max)) + zatau * EXP(-gphit(ji,jj)**2/zdeltatau**2) )
             taum(ji,jj) = ABS( utau(ji,jj) )
             IF( utau(ji,jj) > 0 )   taum(ji,jj) = taum(ji,jj) * 1.3_wp   ! Boost in westerlies for TKE
             !
@@ -503,5 +511,46 @@ CONTAINS
       END_2D
      ENDIF
    END SUBROUTINE compute_diurn_cycle
+
+   FUNCTION znl_wnd( pnodes_phi, pnodes_tau, pPhi ) RESULT( putau )
+      !!----------------------------------------------------------------------
+      !!                 ***  ROUTINE  ***
+      !!
+      !! ** Purpose :   Fit a cubic zonal windforcing to a given set of lat/windstress pairs at the profile nodes.
+      !!
+      !! ** Method  :   see TODO'
+      !!
+      !!     
+      !!----------------------------------------------------------------------
+      REAL(wp), DIMENSION(7), INTENT(in    ) ::   pnodes_phi     ! Latitude of nodes    [degrees]
+      REAL(wp), DIMENSION(7), INTENT(in    ) ::   pnodes_tau     ! Values of nodes      [Pa]
+      REAL(wp),               INTENT(in    ) ::   pPhi         ! Latitude at u-point[degrees]
+      !
+      INTEGER                                ::   jn           ! dummy index
+      INTEGER                                ::   ks, kn, kmin ! southern/northern node
+      REAL(wp), DIMENSION(7)                 ::   zdphi        ! difference to node
+      REAL(wp)                               ::   zs           ! saw-function
+      REAL(wp)                               ::   zscurve      ! cubic s-curve between nodes
+      REAL(wp)                               ::   putau        ! Zonal wind stress  [Pa]
+      !
+      DO jn=1,7
+         zdphi(jn) = pnodes_phi(jn) - pPhi
+      END DO
+      !
+      kmin = MINLOC( ABS( zdphi ), DIM=1 )       ! nearest node to latitude
+      !
+      IF( zdphi(kmin)<=0 ) THEN
+         ks = kmin
+         kn = kmin+1
+      ELSE
+         kn = kmin
+         ks = kmin-1
+      ENDIF
+      !
+      zs = MIN( 1._wp, MAX( 0._wp, ( pPhi - pnodes_phi(ks) ) / ( pnodes_phi(kn) - pnodes_phi(ks) ) ) )
+      putau = pnodes_tau(ks) + ( pnodes_tau(kn) - pnodes_tau(ks) ) * ( 3 - 2 * zs ) * zs ** 2
+      !!----------------------------------------------------------------------
+
+   END FUNCTION znl_wnd
    !!======================================================================
 END MODULE usrdef_sbc
