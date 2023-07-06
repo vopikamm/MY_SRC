@@ -20,10 +20,14 @@ MODULE usrdef_zgr
    USE dom_oce!, ONLY:        ! ocean domain
    USE phycst         ! physical constants
    !
-   USE usrdef_nam, ONLY: nn_botcase, rn_distlam, rn_H, rn_hborder,         &
-                     &   ln_sco_nam, ln_zco_nam, ln_zps_nam, nn_ztype,     &
-                     &   ln_Iperio, rn_cha_min, rn_cha_max, rn_e1_deg,     &
-                     &   nn_jeq_min, merc_proj, ln_mid_ridge, ln_drake_sill     
+   USE usrdef_nam, ONLY: nn_botcase, rn_distlam, rn_H, rn_hborder,            &
+                     &   ln_sco_nam, ln_zco_nam, ln_zps_nam, nn_ztype,        &
+                     &   ln_Iperio, rn_cha_min, rn_cha_max, rn_e1_deg,        &
+                     &   nn_jeq_min, merc_proj, ln_mid_ridge, ln_drake_sill,  &
+                     &   rn_dzmin, rn_hco, rn_kth, rn_acr, rn_slp_cha,        &
+                     &   rn_ds_depth, rn_ds_width, rn_mr_depth, rn_mr_width,  &
+                     &   rn_mr_lat_n, rn_mr_lat_s, nn_mr_edge     
+   !
    !!rc USE depth_e3       ! depth <=> e3
    USE zgr_lib    ! tools for vertical coordinate
    !
@@ -67,11 +71,8 @@ CONTAINS
       REAL(wp), DIMENSION(:,:,:), INTENT(out) ::   pe3w , pe3uw, pe3vw         ! i-scale factors 
       INTEGER , DIMENSION(:,:)  , INTENT(out) ::   k_top, k_bot                ! first & last ocean level
       !
-      INTEGER  ::   ji, jj        ! dummy loop index
-      REAL(wp) ::   zdzmin    ! minimum value of e3 at the surface   [m]
-      REAL(wp) ::   zkth      ! position of the inflexion point
-      REAL(wp) ::   zh_co     ! approximate layer thickness of z-coordinates at the surface
-      REAL(wp) ::   zacr      ! slope of the tanh
+      INTEGER  ::   ji, jj                                     ! dummy loop index
+      REAL(wp) ::   zdzmin, zkth, zh_co, zacr                  ! Local scalars for the coordinate stretching
       REAL(wp) ::   zHmax
 
       REAL(wp), DIMENSION(jpi,jpj)           ::   zbathy, z2d   ! bathymetry, 2D variable
@@ -181,11 +182,11 @@ CONTAINS
 !   ===   s-coordinate   ===   !
       IF( ld_sco ) THEN
          !
-         ! !!dk TODO: write params in namelist
-         zdzmin  = 10._wp
-         zkth    = 35._wp
-         zh_co   = 1000._wp
-         zacr    = 10.5_wp
+         zdzmin  = rn_dzmin
+         zkth    = rn_kth
+         zh_co   = rn_hco
+         zacr    = rn_acr
+         !
          CALL zgr_sco_mi96( pdept_1d, pdepw_1d,                   &   ! ==>>  1D reference vertical coordinate
             &               zbathy  , zHmax   ,                   &   ! <<==  bathymetry
             &               zdzmin  , zkth    , zh_co , zacr,     &   ! <<==  parameters for the tanh stretching
@@ -243,13 +244,16 @@ CONTAINS
       REAL(wp)                , INTENT(inout) ::   pH       ! ocean depth maximum   [m]
       REAL(wp), DIMENSION(:,:), INTENT(  out) ::   pbathy   ! Ocean bathymetry      [m]
       !
-      INTEGER  ::   ji, jj, jhl             ! dummy loop indices
-      !INTEGER  ::   nn_cha_min, nn_cha_max         ! index of the chanel boundaries
-      REAL(wp) ::   zmaxlam, zmaxphi, zminlam, zminphi
-      REAL(wp) ::   zx, zy                                   ! local scalars
-      REAL(wp) ::   z1_H, z1_dLam, z1_dPhi, zxnorm, zynorm   ! local scalars
-      REAL(wp) ::   zdistPhi, ztaper, zmidLam, zmidPhi, zrad ! local scalars
-      REAL(wp), DIMENSION(jpi,jpj)     ::   zlamt, zphit     ! local horizontal coordinate arrays
+      INTEGER  ::   ji, jj, jhl, inum             ! dummy loop indices
+      REAL(wp) ::   zmaxlam, zmaxphi, zminlam, zminphi         ! local scalars (horizontal extent)
+      REAL(wp) ::   zx, zy                                     ! local scalars
+      REAL(wp) ::   zcha_min, zcha_max, zslp_cha               ! local scalars (channel)
+      REAL(wp) ::   zmr_depth, zmr_width, zds_depth, zds_width ! local scalars (MR and DS)
+      REAL(wp) ::   zmr_lat_s, zmr_lat_n, zcha_width, zgauss   ! local scalars (MR and DS)
+      REAL(wp) ::   z1_H, z1_dLam, z1_dPhi, zxnorm, zynorm     ! local scalars
+      REAL(wp) ::   zdistPhi, ztaper, zmidLam, zmidPhi, zrad   ! local scalars
+      REAL(wp) ::   zdistLam                                   ! local scalars (boundary)
+      REAL(wp), DIMENSION(jpi,jpj)     ::   zlamt, zphit       ! local horizontal coordinate arrays
       REAL(wp), DIMENSION(jpi,jpj)     ::   z2d
       !!----------------------------------------------------------------------
       !
@@ -264,14 +268,6 @@ CONTAINS
       !Extend the horizontal coordinates beyond inner points for bathymetry computation
       zlamt(:,:) = glamt(:,:)
       zphit(:,:) = gphit(:,:)
-      !
-      ! IF( mig(1) == 1 ) THEN
-      !    zlamt(1,:) = glamt(1,:) - 1./rad * ASIN ( TANH( rn_e1_deg * rad) )
-      ! ENDIF
-      ! !
-      ! IF( mjg(1) == 1 ) THEN
-      !    zphit(:,1) = gphit(:,1) - rn_e1_deg
-      ! ENDIF
       !
       IF( mig(jpi) == jpiglo ) THEN
          zlamt(jpi,:) = glamt(jpi-1,:) + 1./rad * ASIN ( TANH( rn_e1_deg * rad) )
@@ -312,11 +308,11 @@ CONTAINS
          ENDIF
          !
          CALL zgr_get_boundaries( zmaxlam, zminlam, zmaxphi, zminphi )
-         !rn_distLam = 3._wp
+         zdistLam = rn_distLam
          zdistPhi =  COS( rad * zmaxphi ) * rn_distLam
          !
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-               zx = cosh_bathy(rn_distLam, zminlam, zmaxlam, zlamt( ji,jj))
+               zx = cosh_bathy(zdistLam, zminlam, zmaxlam, zlamt( ji,jj))
                zy = cosh_bathy(zdistphi, zminphi, zmaxphi, zphit( ji, jj))
                pbathy(ji,jj) = zx * zy * ( pH - rn_hborder ) + rn_hborder
          END_2D
@@ -338,38 +334,87 @@ CONTAINS
       END SELECT
       !
       ! Check that zHmax is really the maximum on the inner domain
+      !
       z2d(:,:) = pbathy(:,:)
       CALL lbc_lnk( 'usr_def_zgr', z2d, 'T', 1._wp )   ! put the land boundaries to 0
       pH = MAXVAL(z2d(:,:))
       IF( lk_mpp )   CALL mpp_max( 'zgr_bat', pH )
       IF(lwp)   WRITE(numout,*) '      Effective Hmax   = ', pH, ' m      while rn_H   = ', rn_H, ' m'
       !
-      ! Mid-Atlantic ridge
-      IF (ln_mid_ridge) THEN
-         zmidLam = (zmaxlam + zminlam) / 2
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            IF (zphit(ji, jj) >= (rn_cha_min + rn_cha_max) / 2) THEN
-               pbathy(ji,jj) = gauss_bathy( 8.0, zmidLam, zlamt(ji, jj), 2000., pbathy(ji, jj))
-            ENDIF
-         END_2D
-      ENDIF
-      !
       ! Flattening the bathymetry in the channel
+      !
+      zslp_cha = rn_slp_cha
+      zcha_min = rn_cha_min
+      zcha_max = rn_cha_max
+      !
       IF( ln_Iperio )   THEN
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            IF (zphit(ji, jj) >= rn_cha_min .AND. zphit(ji, jj) <= rn_cha_max) THEN
-               ztaper = cosh_bathy(1.5, rn_cha_min, rn_cha_max, zphit(ji,jj))
+            IF (zphit(ji, jj) >= zcha_min .AND. zphit(ji, jj) <= zcha_max) THEN
+               ztaper = cosh_bathy(rn_slp_cha, zcha_min, zcha_max, zphit(ji,jj))
                pbathy(ji,jj) = pH * ztaper + pbathy(ji,jj) * ( 1._wp - ztaper )
             ENDIF
          END_2D
       ENDIF
       !
+      ! Mid-Atlantic ridge
+      !
+      zmr_depth = rn_mr_depth
+      zmr_width  = rn_mr_width
+      zmr_lat_s  = rn_mr_lat_s
+      zmr_lat_n  = rn_mr_lat_n
+      zcha_width = ( rn_cha_max - rn_cha_min )
+      !
+      IF (ln_mid_ridge) THEN
+         zmidLam = (zmaxlam + zminlam) / 2
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+            IF (zphit(ji, jj) >= zmr_lat_s .AND. zphit(ji, jj) <= zmr_lat_n) THEN
+               pbathy(ji,jj) = gauss_bathy( zmr_width, zmidLam, zlamt(ji, jj), zmr_depth, pbathy(ji, jj))
+            ENDIF
+         END_2D
+         !
+         SELECT CASE(nn_mr_edge)
+         !
+         CASE(0)     ! Edge in cosh shape
+         !
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+               IF (zphit(ji, jj) >= zmr_lat_s - zcha_width / 2 .AND. zphit(ji, jj) <= rn_mr_lat_s) THEN
+                  ztaper = cosh_bathy(rn_slp_cha, zmr_lat_s - zcha_width, zmr_lat_s, zphit(ji,jj))
+                  pbathy(ji,jj) = pH * ztaper + pbathy(ji,jj) * ( 1._wp - ztaper )
+               ELSE IF (zphit(ji, jj) >= zmr_lat_n .AND. zphit(ji, jj) <= rn_mr_lat_n + zcha_width / 2) THEN
+                  ztaper = cosh_bathy(rn_slp_cha, zmr_lat_n, zmr_lat_n + zcha_width, zphit(ji,jj))
+                  pbathy(ji,jj) = pH * ztaper + pbathy(ji,jj) * ( 1._wp - ztaper )
+               ENDIF
+         END_2D
+         !
+         CASE(1)     ! Edge in gaussian shape
+         !
+         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+               IF (zphit(ji, jj) <= rn_mr_lat_s) THEN
+                  zgauss = gauss_bathy(zmr_width, zmidLam, zlamt(ji, jj), zmr_depth, pH) !dk:TODO since ph, not pbathy maybe slight differences?
+                  pbathy(ji,jj) = gauss_bathy( 2 * zslp_cha, rn_mr_lat_s, zphit(ji, jj), zgauss, pbathy(ji, jj))
+               ELSE IF (zphit(ji, jj) >= rn_mr_lat_n) THEN
+                  zgauss = gauss_bathy(zmr_width, zmidLam, zlamt(ji, jj), zmr_depth, pH)
+                  pbathy(ji,jj) = gauss_bathy( 2 * zslp_cha, rn_mr_lat_n, zphit(ji, jj), zgauss, pbathy(ji, jj))
+               ENDIF
+         END_2D
+         !
+         CASE DEFAULT
+            CALL ctl_stop( 'zgr_bat: The chosen case for the mid-atlantic ridge does not exist (nn_mr_edge).' )
+         !
+         END SELECT
+         !
+      ENDIF
+      !
       ! Drake-Sill
+      !
+      zds_depth = rn_ds_depth
+      zds_width = rn_ds_width
+      !
       IF (ln_drake_sill) THEN
          zmidPhi = (rn_cha_max + rn_cha_min) / 2
          zrad    = (rn_cha_max - rn_cha_min) / 2
          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            pbathy(ji,jj) = gauss_ring( 2., zminlam, zmidphi, zrad, zlamt(ji, ji), zphit(ji, jj), 2500., pbathy(ji, jj))
+            pbathy(ji,jj) = gauss_ring( zds_width, zminlam, zmidphi, zrad, zlamt(ji, ji), zphit(ji, jj), zds_depth, pbathy(ji, jj) )
          END_2D
       ENDIF
    END SUBROUTINE zgr_bat

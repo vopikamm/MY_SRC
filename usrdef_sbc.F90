@@ -62,7 +62,7 @@ CONTAINS
       !
       INTEGER  ::   ji, jj
       REAL(wp) ::   z1_2L 
-      REAL(wp) ::   zdeltasst, zts_eq, zts_n, zdeltaT
+      REAL(wp) ::   zdeltasst, zts_eq, zts_n, zts_s, zdeltaT
       REAL(wp) ::   zdeltaemp, zemp_mean, zF0, zconv, zaemp, zb, zdeltaemp2, zaemp2
       REAL(wp), DIMENSION(7)  ::  znodes_phi     ! Latitude of nodes    [degrees]
       REAL(wp), DIMENSION(7)  ::  znodes_tau     ! Values of nodes      [Pa]
@@ -263,16 +263,18 @@ CONTAINS
          ! T star and qns
          !ztrp          = -40._wp     ! [W/m2/K] retroaction term on heat fluxes 
          zts_eq        =  25._wp     ! [deg C] Temperature at the equator
-         zts_n         =   0._wp     ! [deg C] Temperature in the north
+         zts_n         =   1._wp     ! [deg C] Temperature in the north
+         zts_s         =   0._wp     ! [deg C] Temperature in the south
          zdeltasst     =  16.22_wp   ! [deg North]
          z1_2L         =   1._wp / (2._wp * rn_phi_max)
-         zdeltaT = 2                 ! [deg C] half difference of temperature during winter and summer in the north (magnitude of the cos) !!rc TODO set in namelist
+         zdeltaT       = 2           ! [deg C] half difference of temperature during winter and summer in the north (magnitude of the cos) !!rc TODO set in namelist
+         ! zdeltaT_s     = 2           ! [deg C] half difference of temperature during winter and summer in the north (magnitude of the cos) !!rc TODO set in namelist !!dk necessary?
          ! EMP
          zconv         =   1._wp / ( 86400._wp)   ! convertion factor: 1 mm/day => 1/(3600*24) mm/s
          !!rc TODO put a1, a2 and a3 in namelist
          za1 = -3.24_wp              ! [mm/day] Set the amplitude of EMP at the equator
          za2 = 4.15_wp               ! [mm/day] Set the amplitude of EMP at mid latitude
-         za3 = -1.59_wp              ! [mm/day] Set the amplitude of EMP at the northern part
+         za3 = -1.59_wp              ! [mm/day] Set the amplitude of EMP at the northern part !!dk TODO is there an asymmetry in the emp forcing as well?
          zphi01 = 0._wp              ! [deg North]
          zphi02 = 20._wp             ! [deg North]
          zphi03 = 50._wp             ! [deg North]
@@ -332,7 +334,11 @@ CONTAINS
             ! T*
             ! See https://www.desmos.com/calculator/zij8tgy5yr
             ! Seasonnal cycle on T* coming from zcos_sais2
-            ztstar(ji,jj)   = (zts_eq - (zts_n + zcos_sais2 * zdeltaT) ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + (zts_n + zcos_sais2 * zdeltaT)
+            IF (gphit(ji, jj) >= 0._wp) THEN
+               ztstar(ji,jj)   = (zts_eq - (zts_n + zcos_sais2 * zdeltaT) ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + (zts_n + zcos_sais2 * zdeltaT)
+            ELSE
+               ztstar(ji,jj)   = (zts_eq - (zts_s - zcos_sais2 * zdeltaT) ) * COS( ( rpi * gphit(ji,jj) ) * z1_2L )**2 + (zts_n - zcos_sais2 * zdeltaT)
+            ENDIF
          END_2D
          !
          !emp(:,:) = rn_emp_prop * emp(:,:)   ! taking the proportionality factor into account

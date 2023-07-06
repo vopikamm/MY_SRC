@@ -585,215 +585,215 @@ CONTAINS
       !
    END FUNCTION mi96_1d
 
-   SUBROUTINE zgr_bat_env    !    ( pbat, pbat_env )
-      !!----------------------------------------------------------------------
-      !!                  ***  ROUTINE zgr_sco  ***
-      !!                     
-      !! ** Purpose :   define an envelop 
-      !!
-      !! ** Method  :   s-coordinate
-      !!----------------------------------------------------------------------
+!    SUBROUTINE zgr_bat_env    !    ( pbat, pbat_env )
+!       !!----------------------------------------------------------------------
+!       !!                  ***  ROUTINE zgr_sco  ***
+!       !!                     
+!       !! ** Purpose :   define an envelop 
+!       !!
+!       !! ** Method  :   s-coordinate
+!       !!----------------------------------------------------------------------
       
-      !!
-      REAL(wp) ::   rn_rmax, rn_sbot_max, rn_sbot_min    !!rc TODO argument
-      !
-      INTEGER  ::   ji, jj, jk, jl           ! dummy loop argument
-      INTEGER  ::   iip1, ijp1, iim1, ijm1   ! temporary integers
-      INTEGER  ::   ios                      ! Local integer output status for namelist read
-      REAL(wp) ::   zrmax, ztaper   ! temporary scalars
-      REAL(wp) ::   zrfact
-      !
-      REAL(wp), DIMENSION(jpi,jpj) :: ztmpi1, ztmpi2, ztmpj1, ztmpj2
-      REAL(wp), DIMENSION(jpi,jpj) :: zenv, ztmp, zmsk, zri, zrj, zhbat
-      REAL(wp), DIMENSION(jpi,jpj) :: bathy, hbatt, hbatu, hbatv, hbatf
-      REAL(wp), DIMENSION(jpi,jpj) :: hift, hifu, hifv, hiff, scosrf, scobot
-      !!
-      !!----------------------------------------------------------------------
-      !
+!       !!
+!       REAL(wp) ::   rn_rmax, rn_sbot_max, rn_sbot_min    !!rc TODO argument
+!       !
+!       INTEGER  ::   ji, jj, jk, jl           ! dummy loop argument
+!       INTEGER  ::   iip1, ijp1, iim1, ijm1   ! temporary integers
+!       INTEGER  ::   ios                      ! Local integer output status for namelist read
+!       REAL(wp) ::   zrmax, ztaper   ! temporary scalars
+!       REAL(wp) ::   zrfact
+!       !
+!       REAL(wp), DIMENSION(jpi,jpj) :: ztmpi1, ztmpi2, ztmpj1, ztmpj2
+!       REAL(wp), DIMENSION(jpi,jpj) :: zenv, ztmp, zmsk, zri, zrj, zhbat
+!       REAL(wp), DIMENSION(jpi,jpj) :: bathy, hbatt, hbatu, hbatv, hbatf
+!       REAL(wp), DIMENSION(jpi,jpj) :: hift, hifu, hifv, hiff, scosrf, scobot
+!       !!
+!       !!----------------------------------------------------------------------
+!       !
 
-      hift(:,:) = rn_sbot_min                     ! set the minimum depth for the s-coordinate
-      hifu(:,:) = rn_sbot_min
-      hifv(:,:) = rn_sbot_min
-      hiff(:,:) = rn_sbot_min
+!       hift(:,:) = rn_sbot_min                     ! set the minimum depth for the s-coordinate
+!       hifu(:,:) = rn_sbot_min
+!       hifv(:,:) = rn_sbot_min
+!       hiff(:,:) = rn_sbot_min
 
-      !                                        ! set maximum ocean depth
-      bathy(:,:) = MIN( rn_sbot_max, bathy(:,:) )
+!       !                                        ! set maximum ocean depth
+!       bathy(:,:) = MIN( rn_sbot_max, bathy(:,:) )
 
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            IF( bathy(ji,jj) > 0._wp )   bathy(ji,jj) = MAX( rn_sbot_min, bathy(ji,jj) )
-         END_2D
-      !                                        ! =============================
-      !                                        ! Define the envelop bathymetry   (hbatt)
-      !                                        ! =============================
-      ! use r-value to create hybrid coordinates
-      zenv(:,:) = bathy(:,:)
-      !
-      ! set first land point adjacent to a wet cell to sbot_min as this needs to be included in smoothing
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            IF( bathy(ji,jj) == 0._wp ) THEN
-               iip1 = MIN( ji+1, jpi )
-               ijp1 = MIN( jj+1, jpj )
-               iim1 = MAX( ji-1, 1 )
-               ijm1 = MAX( jj-1, 1 )
-!!gm BUG fix see ticket #1617
-               IF( ( + bathy(iim1,ijm1) + bathy(ji,ijp1) + bathy(iip1,ijp1)              &
-                  &  + bathy(iim1,jj  )                  + bathy(iip1,jj  )              &
-                  &  + bathy(iim1,ijm1) + bathy(ji,ijm1) + bathy(iip1,ijp1)  ) > 0._wp ) &
-                  &    zenv(ji,jj) = rn_sbot_min
-!!gm
-!!gm               IF( ( bathy(iip1,jj  ) + bathy(iim1,jj  ) + bathy(ji,ijp1  ) + bathy(ji,ijm1) +         &
-!!gm                  &  bathy(iip1,ijp1) + bathy(iim1,ijm1) + bathy(iip1,ijp1) + bathy(iim1,ijm1)) > 0._wp ) THEN
-!!gm               zenv(ji,jj) = rn_sbot_min
-!!gm             ENDIF
-!!gm end
-            ENDIF
-         END_2D
+!          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!             IF( bathy(ji,jj) > 0._wp )   bathy(ji,jj) = MAX( rn_sbot_min, bathy(ji,jj) )
+!          END_2D
+!       !                                        ! =============================
+!       !                                        ! Define the envelop bathymetry   (hbatt)
+!       !                                        ! =============================
+!       ! use r-value to create hybrid coordinates
+!       zenv(:,:) = bathy(:,:)
+!       !
+!       ! set first land point adjacent to a wet cell to sbot_min as this needs to be included in smoothing
+!          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!             IF( bathy(ji,jj) == 0._wp ) THEN
+!                iip1 = MIN( ji+1, jpi )
+!                ijp1 = MIN( jj+1, jpj )
+!                iim1 = MAX( ji-1, 1 )
+!                ijm1 = MAX( jj-1, 1 )
+! !!gm BUG fix see ticket #1617
+!                IF( ( + bathy(iim1,ijm1) + bathy(ji,ijp1) + bathy(iip1,ijp1)              &
+!                   &  + bathy(iim1,jj  )                  + bathy(iip1,jj  )              &
+!                   &  + bathy(iim1,ijm1) + bathy(ji,ijm1) + bathy(iip1,ijp1)  ) > 0._wp ) &
+!                   &    zenv(ji,jj) = rn_sbot_min
+! !!gm
+! !!gm               IF( ( bathy(iip1,jj  ) + bathy(iim1,jj  ) + bathy(ji,ijp1  ) + bathy(ji,ijm1) +         &
+! !!gm                  &  bathy(iip1,ijp1) + bathy(iim1,ijm1) + bathy(iip1,ijp1) + bathy(iim1,ijm1)) > 0._wp ) THEN
+! !!gm               zenv(ji,jj) = rn_sbot_min
+! !!gm             ENDIF
+! !!gm end
+!             ENDIF
+!          END_2D
 
-      ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
-      CALL lbc_lnk( 'zgr_bat_env', zenv, 'T', 1._wp)
-      ! 
-      ! smooth the bathymetry (if required)
-      scosrf(:,:) = 0._wp             ! ocean surface depth (here zero: no under ice-shelf sea)
-      scobot(:,:) = bathy(:,:)        ! ocean bottom  depth
-      !
-      jl = 0
-      zrmax = 1._wp
-      !   
-      !     
-      ! set scaling factor used in reducing vertical gradients
-      zrfact = ( 1._wp - rn_rmax ) / ( 1._wp + rn_rmax )
-      !
-      ! initialise temporary evelope depth arrays
-      ztmpi1(:,:) = zenv(:,:)
-      ztmpi2(:,:) = zenv(:,:)
-      ztmpj1(:,:) = zenv(:,:)
-      ztmpj2(:,:) = zenv(:,:)
-      !
-      ! initialise temporary r-value arrays
-      zri(:,:) = 1._wp
-      zrj(:,:) = 1._wp
-      !                                                            ! ================ !
-      DO WHILE( jl <= 10000 .AND. ( zrmax - rn_rmax ) > 1.e-8_wp ) !  Iterative loop  !
-         !                                                         ! ================ !
-         jl = jl + 1
-         zrmax = 0._wp
-         ! we set zrmax from previous r-values (zri and zrj) first
-         ! if set after current r-value calculation (as previously)
-         ! we could exit DO WHILE prematurely before checking r-value
-         ! of current zenv
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            zrmax = MAX( zrmax, ABS(zri(ji,jj)), ABS(zrj(ji,jj)) )
-         END_2D
-         zri(:,:) = 0._wp
-         zrj(:,:) = 0._wp
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            iip1 = MIN( ji+1, jpi )      ! force zri = 0 on last line (ji=ncli+1 to jpi)
-            ijp1 = MIN( jj+1, jpj )      ! force zrj = 0 on last raw  (jj=nclj+1 to jpj)
-            IF( (zenv(ji,jj) > 0._wp) .AND. (zenv(iip1,jj) > 0._wp)) THEN
-               zri(ji,jj) = ( zenv(iip1,jj  ) - zenv(ji,jj) ) / ( zenv(iip1,jj  ) + zenv(ji,jj) )
-            END IF
-            IF( (zenv(ji,jj) > 0._wp) .AND. (zenv(ji,ijp1) > 0._wp)) THEN
-               zrj(ji,jj) = ( zenv(ji  ,ijp1) - zenv(ji,jj) ) / ( zenv(ji  ,ijp1) + zenv(ji,jj) )
-            END IF
-            IF( zri(ji,jj) >  rn_rmax )   ztmpi1(ji  ,jj  ) = zenv(iip1,jj  ) * zrfact
-            IF( zri(ji,jj) < -rn_rmax )   ztmpi2(iip1,jj  ) = zenv(ji  ,jj  ) * zrfact
-            IF( zrj(ji,jj) >  rn_rmax )   ztmpj1(ji  ,jj  ) = zenv(ji  ,ijp1) * zrfact
-            IF( zrj(ji,jj) < -rn_rmax )   ztmpj2(ji  ,ijp1) = zenv(ji  ,jj  ) * zrfact
-         END_2D
-         IF( lk_mpp )   CALL mpp_max( 'zgr_bat_env', zrmax )   ! max over the global domain
-         !
-         IF(lwp)WRITE(numout,*) 'zgr_sco :   iter= ',jl, ' rmax= ', zrmax
-         !
+!       ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
+!       CALL lbc_lnk( 'zgr_bat_env', zenv, 'T', 1._wp)
+!       ! 
+!       ! smooth the bathymetry (if required)
+!       scosrf(:,:) = 0._wp             ! ocean surface depth (here zero: no under ice-shelf sea)
+!       scobot(:,:) = bathy(:,:)        ! ocean bottom  depth
+!       !
+!       jl = 0
+!       zrmax = 1._wp
+!       !   
+!       !     
+!       ! set scaling factor used in reducing vertical gradients
+!       zrfact = ( 1._wp - rn_rmax ) / ( 1._wp + rn_rmax )
+!       !
+!       ! initialise temporary evelope depth arrays
+!       ztmpi1(:,:) = zenv(:,:)
+!       ztmpi2(:,:) = zenv(:,:)
+!       ztmpj1(:,:) = zenv(:,:)
+!       ztmpj2(:,:) = zenv(:,:)
+!       !
+!       ! initialise temporary r-value arrays
+!       zri(:,:) = 1._wp
+!       zrj(:,:) = 1._wp
+!       !                                                            ! ================ !
+!       DO WHILE( jl <= 10000 .AND. ( zrmax - rn_rmax ) > 1.e-8_wp ) !  Iterative loop  !
+!          !                                                         ! ================ !
+!          jl = jl + 1
+!          zrmax = 0._wp
+!          ! we set zrmax from previous r-values (zri and zrj) first
+!          ! if set after current r-value calculation (as previously)
+!          ! we could exit DO WHILE prematurely before checking r-value
+!          ! of current zenv
+!          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!             zrmax = MAX( zrmax, ABS(zri(ji,jj)), ABS(zrj(ji,jj)) )
+!          END_2D
+!          zri(:,:) = 0._wp
+!          zrj(:,:) = 0._wp
+!          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!             iip1 = MIN( ji+1, jpi )      ! force zri = 0 on last line (ji=ncli+1 to jpi)
+!             ijp1 = MIN( jj+1, jpj )      ! force zrj = 0 on last raw  (jj=nclj+1 to jpj)
+!             IF( (zenv(ji,jj) > 0._wp) .AND. (zenv(iip1,jj) > 0._wp)) THEN
+!                zri(ji,jj) = ( zenv(iip1,jj  ) - zenv(ji,jj) ) / ( zenv(iip1,jj  ) + zenv(ji,jj) )
+!             END IF
+!             IF( (zenv(ji,jj) > 0._wp) .AND. (zenv(ji,ijp1) > 0._wp)) THEN
+!                zrj(ji,jj) = ( zenv(ji  ,ijp1) - zenv(ji,jj) ) / ( zenv(ji  ,ijp1) + zenv(ji,jj) )
+!             END IF
+!             IF( zri(ji,jj) >  rn_rmax )   ztmpi1(ji  ,jj  ) = zenv(iip1,jj  ) * zrfact
+!             IF( zri(ji,jj) < -rn_rmax )   ztmpi2(iip1,jj  ) = zenv(ji  ,jj  ) * zrfact
+!             IF( zrj(ji,jj) >  rn_rmax )   ztmpj1(ji  ,jj  ) = zenv(ji  ,ijp1) * zrfact
+!             IF( zrj(ji,jj) < -rn_rmax )   ztmpj2(ji  ,ijp1) = zenv(ji  ,jj  ) * zrfact
+!          END_2D
+!          IF( lk_mpp )   CALL mpp_max( 'zgr_bat_env', zrmax )   ! max over the global domain
+!          !
+!          IF(lwp)WRITE(numout,*) 'zgr_sco :   iter= ',jl, ' rmax= ', zrmax
+!          !
          
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            zenv(ji,jj) = MAX(zenv(ji,jj), ztmpi1(ji,jj), ztmpi2(ji,jj), ztmpj1(ji,jj), ztmpj2(ji,jj) )
-         END_2D
-         ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
-         CALL lbc_lnk( 'zgr_bat_env',  zenv, 'T', 1._wp)
-         !                                                  ! ================ !
-      END DO                                                !     End loop     !
-      !                                                     ! ================ !
-      DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-         zenv(ji,jj) = MAX( zenv(ji,jj), rn_sbot_min ) ! set all points to avoid undefined scale value warnings
-      END_2D
-      !
-      ! Envelope bathymetry saved in hbatt
-      hbatt(:,:) = zenv(:,:) 
-      IF( MINVAL( gphit(:,:) ) * MAXVAL( gphit(:,:) ) <= 0._wp ) THEN
-         CALL ctl_warn( ' s-coordinates are tapered in vicinity of the Equator' )
-         DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-            ztaper = EXP( -(gphit(ji,jj)/8._wp)**2._wp )
-            hbatt(ji,jj) = rn_sbot_max * ztaper + hbatt(ji,jj) * ( 1._wp - ztaper )
-         END_2D
-      ENDIF
-      !
+!          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!             zenv(ji,jj) = MAX(zenv(ji,jj), ztmpi1(ji,jj), ztmpi2(ji,jj), ztmpj1(ji,jj), ztmpj2(ji,jj) )
+!          END_2D
+!          ! apply lateral boundary condition   CAUTION: keep the value when the lbc field is zero
+!          CALL lbc_lnk( 'zgr_bat_env',  zenv, 'T', 1._wp)
+!          !                                                  ! ================ !
+!       END DO                                                !     End loop     !
+!       !                                                     ! ================ !
+!       DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!          zenv(ji,jj) = MAX( zenv(ji,jj), rn_sbot_min ) ! set all points to avoid undefined scale value warnings
+!       END_2D
+!       !
+!       ! Envelope bathymetry saved in hbatt
+!       hbatt(:,:) = zenv(:,:) 
+!       IF( MINVAL( gphit(:,:) ) * MAXVAL( gphit(:,:) ) <= 0._wp ) THEN
+!          CALL ctl_warn( ' s-coordinates are tapered in vicinity of the Equator' )
+!          DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!             ztaper = EXP( -(gphit(ji,jj)/8._wp)**2._wp )
+!             hbatt(ji,jj) = rn_sbot_max * ztaper + hbatt(ji,jj) * ( 1._wp - ztaper )
+!          END_2D
+!       ENDIF
+!       !
       
-            !
-      !
-      !                                        ! ==============================
-      !                                        !   hbatu, hbatv, hbatf fields
-      !                                        ! ==============================
-      IF(lwp) THEN
-         WRITE(numout,*)
-           WRITE(numout,*) ' zgr_sco: minimum depth of the envelop topography set to : ', rn_sbot_min
-      ENDIF
-      hbatu(:,:) = rn_sbot_min
-      hbatv(:,:) = rn_sbot_min
-      hbatf(:,:) = rn_sbot_min
-      DO jj = 1, jpj - 1
-        DO ji = 1, jpi - 1   ! NO vector opt.
-           hbatu(ji,jj) = 0.50_wp * ( hbatt(ji  ,jj) + hbatt(ji+1,jj  ) )
-           hbatv(ji,jj) = 0.50_wp * ( hbatt(ji  ,jj) + hbatt(ji  ,jj+1) )
-           hbatf(ji,jj) = 0.25_wp * ( hbatt(ji  ,jj) + hbatt(ji  ,jj+1)   &
-              &                     + hbatt(ji+1,jj) + hbatt(ji+1,jj+1) )
-        END DO
-      END DO
+!             !
+!       !
+!       !                                        ! ==============================
+!       !                                        !   hbatu, hbatv, hbatf fields
+!       !                                        ! ==============================
+!       IF(lwp) THEN
+!          WRITE(numout,*)
+!            WRITE(numout,*) ' zgr_sco: minimum depth of the envelop topography set to : ', rn_sbot_min
+!       ENDIF
+!       hbatu(:,:) = rn_sbot_min
+!       hbatv(:,:) = rn_sbot_min
+!       hbatf(:,:) = rn_sbot_min
+!       DO jj = 1, jpj - 1
+!         DO ji = 1, jpi - 1   ! NO vector opt.
+!            hbatu(ji,jj) = 0.50_wp * ( hbatt(ji  ,jj) + hbatt(ji+1,jj  ) )
+!            hbatv(ji,jj) = 0.50_wp * ( hbatt(ji  ,jj) + hbatt(ji  ,jj+1) )
+!            hbatf(ji,jj) = 0.25_wp * ( hbatt(ji  ,jj) + hbatt(ji  ,jj+1)   &
+!               &                     + hbatt(ji+1,jj) + hbatt(ji+1,jj+1) )
+!         END DO
+!       END DO
 
-      ! 
-      ! Apply lateral boundary condition
-!!gm  ! CAUTION: retain non zero value in the initial file this should be OK for orca cfg, not for EEL
-      zhbat(:,:) = hbatu(:,:)   ;   CALL lbc_lnk( 'zgr_bat_env',  hbatu, 'U', 1._wp )
-      DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-         IF( hbatu(ji,jj) == 0._wp ) THEN
-            !No worries about the following line when ln_wd == .true.
-            IF( zhbat(ji,jj) == 0._wp )   hbatu(ji,jj) = rn_sbot_min
-            IF( zhbat(ji,jj) /= 0._wp )   hbatu(ji,jj) = zhbat(ji,jj)
-         ENDIF
-      END_2D
-      zhbat(:,:) = hbatv(:,:)   ;   CALL lbc_lnk( 'zgr_bat_env',  hbatv, 'V', 1._wp )
-      DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-         IF( hbatv(ji,jj) == 0._wp ) THEN
-            IF( zhbat(ji,jj) == 0._wp )   hbatv(ji,jj) = rn_sbot_min
-            IF( zhbat(ji,jj) /= 0._wp )   hbatv(ji,jj) = zhbat(ji,jj)
-         ENDIF
-      END_2D
-      zhbat(:,:) = hbatf(:,:)   ;   CALL lbc_lnk( 'zgr_bat_env',  hbatf, 'F', 1._wp )
-      DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
-         IF( hbatf(ji,jj) == 0._wp ) THEN
-            IF( zhbat(ji,jj) == 0._wp )   hbatf(ji,jj) = rn_sbot_min
-            IF( zhbat(ji,jj) /= 0._wp )   hbatf(ji,jj) = zhbat(ji,jj)
-         ENDIF
-      END_2D
+!       ! 
+!       ! Apply lateral boundary condition
+! !!gm  ! CAUTION: retain non zero value in the initial file this should be OK for orca cfg, not for EEL
+!       zhbat(:,:) = hbatu(:,:)   ;   CALL lbc_lnk( 'zgr_bat_env',  hbatu, 'U', 1._wp )
+!       DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!          IF( hbatu(ji,jj) == 0._wp ) THEN
+!             !No worries about the following line when ln_wd == .true.
+!             IF( zhbat(ji,jj) == 0._wp )   hbatu(ji,jj) = rn_sbot_min
+!             IF( zhbat(ji,jj) /= 0._wp )   hbatu(ji,jj) = zhbat(ji,jj)
+!          ENDIF
+!       END_2D
+!       zhbat(:,:) = hbatv(:,:)   ;   CALL lbc_lnk( 'zgr_bat_env',  hbatv, 'V', 1._wp )
+!       DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!          IF( hbatv(ji,jj) == 0._wp ) THEN
+!             IF( zhbat(ji,jj) == 0._wp )   hbatv(ji,jj) = rn_sbot_min
+!             IF( zhbat(ji,jj) /= 0._wp )   hbatv(ji,jj) = zhbat(ji,jj)
+!          ENDIF
+!       END_2D
+!       zhbat(:,:) = hbatf(:,:)   ;   CALL lbc_lnk( 'zgr_bat_env',  hbatf, 'F', 1._wp )
+!       DO_2D( nn_hls, nn_hls, nn_hls, nn_hls )
+!          IF( hbatf(ji,jj) == 0._wp ) THEN
+!             IF( zhbat(ji,jj) == 0._wp )   hbatf(ji,jj) = rn_sbot_min
+!             IF( zhbat(ji,jj) /= 0._wp )   hbatf(ji,jj) = zhbat(ji,jj)
+!          ENDIF
+!       END_2D
 
-!!bug:  key_helsinki a verifer
-        hift(:,:) = MIN( hift(:,:), hbatt(:,:) )
-        hifu(:,:) = MIN( hifu(:,:), hbatu(:,:) )
-        hifv(:,:) = MIN( hifv(:,:), hbatv(:,:) )
-        hiff(:,:) = MIN( hiff(:,:), hbatf(:,:) )
+! !!bug:  key_helsinki a verifer
+!         hift(:,:) = MIN( hift(:,:), hbatt(:,:) )
+!         hifu(:,:) = MIN( hifu(:,:), hbatu(:,:) )
+!         hifv(:,:) = MIN( hifv(:,:), hbatv(:,:) )
+!         hiff(:,:) = MIN( hiff(:,:), hbatf(:,:) )
 
-      IF(lwp )   THEN
-         WRITE(numout,*) ' MAX val hif   t ', MAXVAL( hift (:,:) ), ' f ', MAXVAL( hiff (:,:) ),  &
-            &                        ' u ',   MAXVAL( hifu (:,:) ), ' v ', MAXVAL( hifv (:,:) )
-         WRITE(numout,*) ' MIN val hif   t ', MINVAL( hift (:,:) ), ' f ', MINVAL( hiff (:,:) ),  &
-            &                        ' u ',   MINVAL( hifu (:,:) ), ' v ', MINVAL( hifv (:,:) )
-         WRITE(numout,*) ' MAX val hbat  t ', MAXVAL( hbatt(:,:) ), ' f ', MAXVAL( hbatf(:,:) ),  &
-            &                        ' u ',   MAXVAL( hbatu(:,:) ), ' v ', MAXVAL( hbatv(:,:) )
-         WRITE(numout,*) ' MIN val hbat  t ', MINVAL( hbatt(:,:) ), ' f ', MINVAL( hbatf(:,:) ),  &
-            &                        ' u ',   MINVAL( hbatu(:,:) ), ' v ', MINVAL( hbatv(:,:) )
-      ENDIF
-!! helsinki
-      !
-   END SUBROUTINE zgr_bat_env
+!       IF(lwp )   THEN
+!          WRITE(numout,*) ' MAX val hif   t ', MAXVAL( hift (:,:) ), ' f ', MAXVAL( hiff (:,:) ),  &
+!             &                        ' u ',   MAXVAL( hifu (:,:) ), ' v ', MAXVAL( hifv (:,:) )
+!          WRITE(numout,*) ' MIN val hif   t ', MINVAL( hift (:,:) ), ' f ', MINVAL( hiff (:,:) ),  &
+!             &                        ' u ',   MINVAL( hifu (:,:) ), ' v ', MINVAL( hifv (:,:) )
+!          WRITE(numout,*) ' MAX val hbat  t ', MAXVAL( hbatt(:,:) ), ' f ', MAXVAL( hbatf(:,:) ),  &
+!             &                        ' u ',   MAXVAL( hbatu(:,:) ), ' v ', MAXVAL( hbatv(:,:) )
+!          WRITE(numout,*) ' MIN val hbat  t ', MINVAL( hbatt(:,:) ), ' f ', MINVAL( hbatf(:,:) ),  &
+!             &                        ' u ',   MINVAL( hbatu(:,:) ), ' v ', MINVAL( hbatv(:,:) )
+!       ENDIF
+! !! helsinki
+!       !
+!    END SUBROUTINE zgr_bat_env
    
    
    SUBROUTINE depth_to_e3_1d( pdept_1d, pdepw_1d, pe3t_1d, pe3w_1d )

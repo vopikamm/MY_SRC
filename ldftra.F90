@@ -65,7 +65,7 @@ MODULE ldftra
 
    !                                   !!* Namelist namtra_eiv : eddy induced velocity param. *
    !                                    != Use/diagnose eiv =!
-   ! LOGICAL , PUBLIC ::   ln_ldfeiv           !: eddy induced velocity flag
+   !LOGICAL , PUBLIC ::   ln_ldfeiv           !: eddy induced velocity flag
    LOGICAL , PUBLIC ::   ln_ldfeiv_dia       !: diagnose & output eiv streamfunction and velocity (IOM)
    !                                    != Coefficients =!
    INTEGER , PUBLIC ::   nn_aei_ijk_t        !: choice of time/space variation of the eiv coeff.
